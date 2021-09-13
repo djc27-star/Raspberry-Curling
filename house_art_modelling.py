@@ -31,9 +31,19 @@ data.groupby('Electrical').size()
 data['Electrical'].fillna('SBrkr',inplace = True)
 
 
-# remove response variable from data
-target = data['SalePrice']
+# remove response variable from data and Id variable
+target = np.log(data['SalePrice'])
 del data['SalePrice']
+del data['Id']
+
+# standardise numerical data
+st_x= StandardScaler() 
+num_data = data.select_dtypes(include = 'number')
+data[num_data.columns] = st_x.fit_transform(num_data)
+del num_data 
+
+# create dummy variables for catogorical data
+data = get_dummies(data)
 
 
 
