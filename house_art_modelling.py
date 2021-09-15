@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 import optuna
 from sklearn.model_selection import cross_val_score
+import xgboost as xgb
 
 # read in data 
 data = pd.read_csv("house_art.csv")
@@ -54,11 +55,8 @@ data = get_dummies(data)
 def rmse(pred,act):
     return np.sqrt(mean_squared_error(pred,act))
 
-# develop a rf model
-data_rf = data[:]
-
 # split data into train and test
-X_train, X_test, Y_train, Y_test = train_test_split(data_rf,
+X_train, X_test, Y_train, Y_test = train_test_split(data,
          target, test_size=0.20, random_state=1, shuffle=True)
 
 # build a simple rf model
@@ -100,6 +98,7 @@ rf_simple2 = rmse(y_test_pred,Y_test)
 
 # we will use 0.99% of the data
 # optimise using optuna
+# comment out optimization as time consuming
 '''def objective(trial):
     bootstrap = trial.suggest_categorical('bootstrap',['True','False'])
     min_samples_split = trial.suggest_int('min_samples_split', 2, 20)
@@ -127,3 +126,32 @@ y_test_pred = optimised_rf.predict(X_test3)
 rf_optimised = rmse(y_test_pred,Y_test)
 
 # optimised model is strongest but barely, will now try another model
+# will try xgboost
+regressor_xbg = xgb.XGBRegressor()
+regressor_xbg.fit(X_train3,Y_train)
+y_test_pred = regressor_xbg.predict(X_test3)
+xgb_basic= rmse(y_test_pred,Y_test)
+
+def objective(trial):
+    eta = trial.suggest_float('eta',0.001,0.999)
+    max_depth = trial.suggest_int('max_depth',2,15)
+    colsample_bytree = trial.suggest_float('colsample_bytree',0.1,1)
+    n_estimators =  trial.suggest_int('n_estimators', 30, 10000)
+    
+    regr = xgb.XGBRegressor(eta = eta,max_depth = max_depth,n_estimators=n_estimators,
+                            colsample_bytree=colsample_bytree)
+    regressor_xbg = regr
+    regressor_xbg.fit(X_train3,Y_train)
+    y_test_pred = regressor_xbg.predict(X_test3)
+
+    return rmse(y_test_pred,Y_test)
+
+study = optuna.create_study(direction='minimize')
+study.optimize(objective, n_trials=100)
+
+# optimized models
+xbg_optimized = xgb.XGBRegressor(eta= 0.04587468576659705, max_depth= 11, 
+                                 colsample_bytree= 0.7121988627323375, n_estimators= 8731)
+xbg_optimized.fit(X_train3,Y_train)
+y_test_pred = xbg_optimized.predict(X_test3)
+xgb_optimized= rmse(y_test_pred,Y_test)
